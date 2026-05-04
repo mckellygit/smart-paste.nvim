@@ -18,6 +18,19 @@ Pasted code automatically lands at the correct indentation level.
 - Zero dependencies: pure Lua, no external plugins required.
 - Zero config: call `setup()` and paste keys are enhanced.
 
+## How is this different from `ggVG=` or `gv=`?
+
+| | `p` then `=` / `ggVG=` | smart-paste.nvim |
+|---|---|---|
+| When indent is fixed | After paste (2 steps) | During paste (1 step) |
+| Undo | 2 steps (paste + reindent) | 1 step |
+| Dot-repeat | Repeats paste only, not reindent | Repeats both |
+| Indentation method | `equalprg` / `indentexpr` only | indentexpr -> treesitter -> heuristic |
+| Treesitter scope awareness | No | Yes |
+| Register rewritten | Sometimes | Never |
+
+`=` re-indents text already in the buffer. smart-paste lands it correctly the first time.
+
 ## Installation
 
 ```lua
