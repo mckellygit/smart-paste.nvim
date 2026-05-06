@@ -6,6 +6,10 @@ local heuristics = require('smart-paste.heuristics')
 -- Module-level state: captured BEFORE g@l fires (v:register and v:count1 reset after)
 local state = {}
 
+local function dd(arg)
+  print(vim.inspect(arg))
+end
+
 --- Repeat a list of lines `count` times.
 --- @param lines string[]
 --- @param count number
@@ -92,40 +96,47 @@ local function resolve_linewise_target_indent(bufnr, cursor_row, after)
   local clamped_row = math.max(0, math.min(cursor_row, line_count - 1))
   local current_indent, current_line = resolve_row_context_indent(bufnr, clamped_row)
 
-  if after then
-    local next_row = clamped_row + 1
-    if next_row < line_count and heuristics.is_scope_opener(current_line, bufnr) then
-      local next_indent, next_line = resolve_row_context_indent(bufnr, next_row)
-      if next_indent > current_indent then
-        return next_indent
-      end
-      if next_line:match('^%s*$') then
-        return current_indent + get_shiftwidth(bufnr)
-      end
-      -- Empty block case: opener followed by a closer at same indent.
-      if heuristics.is_scope_closer(next_line, bufnr) and next_indent <= current_indent then
-        return current_indent + get_shiftwidth(bufnr)
-      end
+  local indent1 = current_indent
+  local line_check_below = math.min(line_count-1 ,cursor_row+40)
+
+  for i = cursor_row, line_check_below do
+    local next_indent, next_line = resolve_row_context_indent(bufnr, i)
+    -- Empty block case: opener followed by a closer at same indent.
+    if heuristics.is_scope_closer(next_line, bufnr) then
+      indent1 = next_indent + get_shiftwidth(bufnr)
+      break
     end
-    return current_indent
+    if heuristics.is_scope_opener(next_line, bufnr) then
+      indent1 = next_indent + get_shiftwidth(bufnr)
+      break
+    end
+    if not next_line:match('^%s*$') then
+      indent1 = next_indent
+      break
+    end
   end
 
-  local prev_row = clamped_row - 1
-  if prev_row >= 0 and heuristics.is_scope_closer(current_line, bufnr) then
-    local prev_indent, prev_line = resolve_row_context_indent(bufnr, prev_row)
-    if prev_indent > current_indent then
-      return prev_indent
-    end
-    if prev_line:match('^%s*$') then
-      return current_indent + get_shiftwidth(bufnr)
-    end
+  local indent2 = current_indent
+  local line_check_above = math.min(0, cursor_row-40)
+
+  for i = cursor_row, line_check_above, -1 do
+    local prev_indent, prev_line = resolve_row_context_indent(bufnr, i)
     -- Empty block case: closer preceded by an opener at same indent.
-    if heuristics.is_scope_opener(prev_line, bufnr) and prev_indent <= current_indent then
-      return current_indent + get_shiftwidth(bufnr)
+    if heuristics.is_scope_opener(prev_line, bufnr) then
+      indent2 = prev_indent + get_shiftwidth(bufnr)
+      break
+    end
+    if heuristics.is_scope_closer(prev_line, bufnr) then
+      indent2 = prev_indent
+      break
+    end
+    if not prev_line:match('^%s*$') then
+      indent2 = prev_indent
+      break
     end
   end
 
-  return current_indent
+  return math.max(current_indent, math.min(indent1, indent2))
 end
 
 --- Expression mapping target for smart paste.
@@ -197,48 +208,43 @@ function M.do_paste(_motion_type)
     follow = false
   end
 
+  --dd(0)
+
   local reginfo = vim.fn.getreginfo(reg)
   if not reginfo or not reginfo.regcontents then
+    dd(1)
     return
   end
 
-  local is_linewise = vim.startswith(reginfo.regtype, 'V')
+  -- local is_linewise = vim.startswith(reginfo.regtype, 'V')
 
-  if not is_linewise then
-    local newline_mode = state.charwise_newline
-    local is_charwise = (reginfo.regtype == 'v')
+  -- if not is_linewise then
+  --   local charwise_newline = state.charwise_newline == true
+  --   local is_charwise = (reginfo.regtype == 'v')
 
-    local lines
-    if is_charwise and (newline_mode == true or newline_mode == 'multiline') then
-      lines = strip_trailing_blank_lines(reginfo.regcontents)
-      -- 'multiline' converts only when the yank effectively spans more than
-      -- one line. The count is taken after dropping the `v$` trailing blank,
-      -- so a single yanked word (or line) keeps the vanilla inline paste.
-      if newline_mode == 'multiline' and #lines <= 1 then
-        lines = nil
-      end
-    end
+  -- mck
+  --  if charwise_newline and is_charwise then
+  --    local lines = strip_trailing_blank_lines(reginfo.regcontents)
+  --    local stripped = strip_leading_whitespace(lines)
+  --    -- Charwise selections drop the first line's indent but keep the inner
+  --    -- lines' absolute indent; rebase the first line so the block's relative
+  --    -- structure survives the shift to the target indent.
+  --    local rebased, source_indent = indent.rebase_charwise_block(stripped)
+  --    local bufnr = vim.api.nvim_get_current_buf()
+  --    local row = vim.api.nvim_win_get_cursor(0)[1] - 1 -- 0-indexed
+  --    local target_indent = resolve_linewise_target_indent(bufnr, row, after)
+  --    local delta = target_indent - source_indent
+  --    local adjusted = indent.apply_delta(rebased, delta, bufnr)
+  --    local final_lines = repeat_lines(adjusted, count)
+  --    vim.api.nvim_put(final_lines, 'l', after, follow)
+  --    return
+  --  end
+  -- mck
 
-    if lines then
-      local stripped = strip_leading_whitespace(lines)
-      -- Charwise selections drop the first line's indent but keep the inner
-      -- lines' absolute indent; rebase the first line so the block's relative
-      -- structure survives the shift to the target indent.
-      local bufnr = vim.api.nvim_get_current_buf()
-      local rebased, source_indent = indent.rebase_charwise_block(stripped, bufnr)
-      local row = vim.api.nvim_win_get_cursor(0)[1] - 1 -- 0-indexed
-      local target_indent = resolve_linewise_target_indent(bufnr, row, after)
-      local delta = target_indent - source_indent
-      local adjusted = indent.apply_delta(rebased, delta, bufnr)
-      local final_lines = repeat_lines(adjusted, count)
-      vim.api.nvim_put(final_lines, 'l', after, follow)
-      return
-    end
-
-    local raw_keys = '"' .. reg .. tostring(count) .. key
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(raw_keys, true, false, true), 'n', false)
-    return
-  end
+  --  local raw_keys = '"' .. reg .. tostring(count) .. key
+  --  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(raw_keys, true, false, true), 'n', false)
+  --  return
+  --end
 
   local lines = reginfo.regcontents
 
@@ -299,10 +305,12 @@ function M.do_visual_paste(reg, _key, vmode, count_override)
   -- linewise selection (`V`) and linewise register (`V...`).
   -- Charwise/blockwise registers fall through to native visual paste.
   local is_linewise_register = type(reginfo.regtype) == 'string' and vim.startswith(reginfo.regtype, 'V')
+  -- mck
   if not is_linewise_register then
     feed_native_visual_paste(reg)
     return
   end
+  -- mck
 
   local start_row = vim.api.nvim_buf_get_mark(0, '<')[1]
   local end_row = vim.api.nvim_buf_get_mark(0, '>')[1]
