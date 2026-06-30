@@ -63,13 +63,14 @@ end
 
 --- Heuristic: line opens an HTML/Vue-like tag block.
 --- Supports single-line tag openers and multiline opener tails (`>` line).
+--- A complete element closed on the same line (e.g. JSX `<li>x</li>`) is not an opener.
 --- @param line string
 --- @return boolean
 local function looks_like_tag_opener(line)
   if line:match('^%s*>%s*$') then
     return true
   end
-  if line:match('^%s*<[%w:_-]') and line:match('>%s*$') and not line:match('/>%s*$') and not line:match('^%s*</') then
+  if line:match('^%s*<[%w:_-]') and line:match('>%s*$') and not line:match('/>%s*$') and not line:match('</') then
     return true
   end
   return false
