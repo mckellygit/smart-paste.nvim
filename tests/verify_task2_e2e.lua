@@ -722,6 +722,47 @@ if lines32[3] ~= '      foo := 42' then
 end
 print('PASS: [p above closer with blank inner line indents inside tag block')
 
+-- Test 33: (issue #11) p after a complete one-line JSX element that sits just
+-- above a closing tag must NOT over-indent. A self-closed element like
+-- `<li>one</li>` is not a block opener, so the sibling lands at the same level.
+set_buf_lines({
+  'function List() {',
+  '    return (',
+  '        <ul>',
+  '            <li>one</li>',
+  '        </ul>',
+  '    );',
+  '}',
+})
+vim.fn.setreg('g', { '<li>two</li>' }, 'V')
+vim.api.nvim_win_set_cursor(0, { 4, 0 })
+paste._test_set_state('g', 1, 'p')
+paste.do_paste('line')
+local lines33 = get_buf_lines()
+if lines33[5] ~= '            <li>two</li>' then
+  fail_with_buffer('p after one-line JSX element should keep sibling at same indent (issue #11)')
+end
+print('PASS: p after one-line JSX element keeps sibling indent (issue #11)')
+
+-- Test 34: genuine single-line tag opener still indents its child one level in.
+set_buf_lines({
+  'function App() {',
+  '    return (',
+  '        <div>',
+  '        </div>',
+  '    );',
+  '}',
+})
+vim.fn.setreg('h', { '<span>hi</span>' }, 'V')
+vim.api.nvim_win_set_cursor(0, { 3, 0 })
+paste._test_set_state('h', 1, 'p')
+paste.do_paste('line')
+local lines34 = get_buf_lines()
+if lines34[4] ~= '            <span>hi</span>' then
+  fail_with_buffer('p on real <div> opener should indent child one level inside block')
+end
+print('PASS: p on real tag opener still indents child inside block')
+
 print('')
 print('ALL END-TO-END INTEGRATION TESTS PASSED')
 vim.cmd('qa!')
