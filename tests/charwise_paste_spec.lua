@@ -223,6 +223,27 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case(']p drops trailing blank from a line-boundary (v$) charwise selection', function()
+    -- A `v$` selection on a non-final line captures the trailing newline, so the
+    -- charwise register gains a trailing empty entry. It must not paste as a
+    -- stray blank line.
+    local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('k', { 'return x', '' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 'k',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'def foo():', '    x = 1', '    return x', '' })
+    delete_buf(bufnr)
+  end)
+
   case(']p with empty charwise register does not crash', function()
     local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
     vim.api.nvim_set_current_buf(bufnr)
