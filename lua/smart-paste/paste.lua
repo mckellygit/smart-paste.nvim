@@ -257,12 +257,15 @@ function M.do_paste(_motion_type)
     if charwise_newline and is_charwise then
       local lines = strip_trailing_blank_lines(reginfo.regcontents)
       local stripped = strip_leading_whitespace(lines)
-      local source_indent = indent.get_source_indent(stripped)
+      -- Charwise selections drop the first line's indent but keep the inner
+      -- lines' absolute indent; rebase the first line so the block's relative
+      -- structure survives the shift to the target indent.
+      local rebased, source_indent = indent.rebase_charwise_block(stripped)
       local bufnr = vim.api.nvim_get_current_buf()
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1 -- 0-indexed
       local target_indent = resolve_linewise_target_indent(bufnr, row, after)
       local delta = target_indent - source_indent
-      local adjusted = indent.apply_delta(stripped, delta, bufnr)
+      local adjusted = indent.apply_delta(rebased, delta, bufnr)
       local final_lines = repeat_lines(adjusted, count)
       vim.api.nvim_put(final_lines, 'l', after, follow)
       return

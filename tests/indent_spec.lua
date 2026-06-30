@@ -366,4 +366,29 @@ describe('indent', function()
       delete_buf(bufnr)
     end)
   end)
+
+  describe('rebase_charwise_block', function()
+    it('rebases first line to block base when the block dedents (closing tag)', function()
+      -- Mimics a `^v...y` charwise selection of an indented block: line 1 lost
+      -- its leading whitespace, inner lines kept their absolute indent.
+      local lines = { '<Group>', '        <Item />', '    </Group>' }
+      local rebased, base = indent.rebase_charwise_block(lines)
+      assert.are.equal(4, base)
+      assert.are.same({ '    <Group>', '        <Item />', '    </Group>' }, rebased)
+    end)
+
+    it('keeps first line at column 0 when the block never dedents', function()
+      local lines = { 'if True:', '    pass' }
+      local rebased, base = indent.rebase_charwise_block(lines)
+      assert.are.equal(0, base)
+      assert.are.same({ 'if True:', '    pass' }, rebased)
+    end)
+
+    it('returns base 0 and leaves single-line content untouched', function()
+      local lines = { '<li>x</li>' }
+      local rebased, base = indent.rebase_charwise_block(lines)
+      assert.are.equal(0, base)
+      assert.are.same({ '<li>x</li>' }, rebased)
+    end)
+  end)
 end)
