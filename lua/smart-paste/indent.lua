@@ -44,6 +44,43 @@ function M.get_source_indent(lines)
   return 0
 end
 
+--- Reconstruct the first line's indentation for a charwise "paste as new line".
+--- A charwise selection drops the first line's leading whitespace while inner
+--- lines keep their absolute indent, so a single uniform shift over-indents the
+--- inner lines by the block's original base. When the block dedents back below
+--- its first inner line (e.g. a closing tag or brace), the first line is an
+--- opener whose base equals the block's minimum inner indent; re-pad it to that
+--- base so the uniform shift preserves the block's relative structure. Blocks
+--- that never dedent (e.g. `if x:` + body) keep the first line at column 0.
+--- @param lines string[] Lines with the first line already left-stripped
+--- @return string[] rebased New table; first line padded to the detected base
+--- @return integer base Visual-column base indent to use as the source indent
+function M.rebase_charwise_block(lines)
+  local result = vim.deepcopy(lines)
+  if #result == 0 then
+    return result, 0
+  end
+
+  local first_inner, min_inner
+  for i = 2, #result do
+    if not is_blank(result[i]) then
+      local vcols = leading_vcols(result[i])
+      if first_inner == nil then
+        first_inner = vcols
+      end
+      if min_inner == nil or vcols < min_inner then
+        min_inner = vcols
+      end
+    end
+  end
+
+  if first_inner ~= nil and min_inner < first_inner then
+    result[1] = string.rep(' ', min_inner) .. result[1]
+    return result, min_inner
+  end
+  return result, 0
+end
+
 --- Heuristic indent fallback: scan upward to nearest non-empty line and
 --- measure its leading whitespace in visual columns.
 --- @param bufnr integer Buffer handle

@@ -244,6 +244,42 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case(']p preserves relative indent of a multi-line block (charwise mid-line select)', function()
+    -- A `^v...y` selection of an indented block drops line 1's whitespace but
+    -- keeps the inner lines' absolute indent. The pasted sibling must match the
+    -- original block's structure, not be over-indented by its base indent.
+    local bufnr = make_buf({
+      '<Wrapper>',
+      '    <Group>',
+      '        <Item />',
+      '    </Group>',
+      '</Wrapper>',
+    })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('l', { '<Group>', '        <Item />', '    </Group>' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 4, 0 })
+    paste._test_set_state({
+      register = 'l',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), {
+      '<Wrapper>',
+      '    <Group>',
+      '        <Item />',
+      '    </Group>',
+      '    <Group>',
+      '        <Item />',
+      '    </Group>',
+      '</Wrapper>',
+    })
+    delete_buf(bufnr)
+  end)
+
   case(']p with empty charwise register does not crash', function()
     local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
     vim.api.nvim_set_current_buf(bufnr)
