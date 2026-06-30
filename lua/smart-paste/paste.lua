@@ -31,6 +31,20 @@ local function strip_leading_whitespace(lines)
   return result
 end
 
+--- Remove trailing empty lines from a list (always keeps at least one line).
+--- A charwise selection ending at a line boundary (e.g. `v$`) captures the
+--- trailing newline as an empty entry; dropping it avoids a stray blank line
+--- once the content is converted to a linewise paste.
+--- @param lines string[]
+--- @return string[]
+local function strip_trailing_blank_lines(lines)
+  local result = vim.deepcopy(lines)
+  while #result > 1 and result[#result] == '' do
+    table.remove(result)
+  end
+  return result
+end
+
 --- Resolve contextual indent for a specific row.
 --- For nonblank lines this uses actual leading whitespace width.
 --- For blank lines it falls back to indent engine prediction.
@@ -241,7 +255,7 @@ function M.do_paste(_motion_type)
     local is_charwise = (reginfo.regtype == 'v')
 
     if charwise_newline and is_charwise then
-      local lines = reginfo.regcontents
+      local lines = strip_trailing_blank_lines(reginfo.regcontents)
       local stripped = strip_leading_whitespace(lines)
       local source_indent = indent.get_source_indent(stripped)
       local bufnr = vim.api.nvim_get_current_buf()
