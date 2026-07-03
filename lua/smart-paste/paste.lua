@@ -97,6 +97,9 @@ local function looks_like_tag_closer(line)
   return line:match('^%s*</[%w:_-][^>]*>%s*$') ~= nil
 end
 
+local SCOPE_OPENER_KEYWORDS = { 'then', 'do', 'else', 'elseif', 'repeat', 'function' }
+local SCOPE_CLOSER_KEYWORDS = { 'end', 'elif', 'else', 'elseif', 'catch', 'finally' }
+
 --- Heuristic: line ends with an opener token for block-like constructs.
 --- @param line string
 --- @return boolean
@@ -107,7 +110,13 @@ local function looks_like_scope_opener(line)
   if looks_like_tag_opener(line) then
     return true
   end
-  return line:match('%f[%a](then|do|else|elseif|repeat|function)%s*$') ~= nil
+  -- Lua patterns have no alternation; test each keyword separately.
+  for _, keyword in ipairs(SCOPE_OPENER_KEYWORDS) do
+    if line:match('%f[%a]' .. keyword .. '%s*$') then
+      return true
+    end
+  end
+  return false
 end
 
 --- Heuristic: line begins with a closing token for block-like constructs.
@@ -120,7 +129,13 @@ local function looks_like_scope_closer(line)
   if looks_like_tag_closer(line) then
     return true
   end
-  return line:match('^%s*(end|elif|else|elseif|catch|finally)%f[%A]') ~= nil
+  -- Lua patterns have no alternation; test each keyword separately.
+  for _, keyword in ipairs(SCOPE_CLOSER_KEYWORDS) do
+    if line:match('^%s*' .. keyword .. '%f[%A]') then
+      return true
+    end
+  end
+  return false
 end
 
 --- Resolve target indent for linewise insertion at the current cursor gap.

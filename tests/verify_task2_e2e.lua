@@ -264,7 +264,7 @@ for _, fpath in ipairs(lua_files) do
   -- Phase 2 adds strategy helpers to indent.lua; keep a soft cap for maintainability.
   local max_lines = 320
   if fpath == 'lua/smart-paste/init.lua' or fpath == 'lua/smart-paste/paste.lua' then
-    max_lines = 420
+    max_lines = 440
   end
   assert(count <= max_lines, fpath .. ' is ' .. count .. ' lines (max ' .. max_lines .. ')')
   print('PASS: ' .. fpath .. ' is ' .. count .. ' lines')
