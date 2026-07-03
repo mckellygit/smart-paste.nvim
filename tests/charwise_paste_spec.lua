@@ -144,6 +144,47 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case('[p above a python elif indents into the if block (issue #15)', function()
+    -- Regression: `dd` a python if-block body, then `[p` above the `elif`.
+    -- The elif line is a keyword scope closer; the paste must target the
+    -- enclosing if-block body indent, not the elif's own indent.
+    local bufnr = make_buf({ 'if foo:', 'elif baz:', '    blah()' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('m', { '    bar()' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 'm',
+      count = 1,
+      key = '[p',
+      after = false,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if foo:', '    bar()', 'elif baz:', '    blah()' })
+    delete_buf(bufnr)
+  end)
+
+  case(']p after a lua keyword opener indents into the empty block', function()
+    -- Regression: `then` is a keyword scope opener (no trailing brace/colon);
+    -- pasting below it into an empty block must indent one level in.
+    local bufnr = make_buf({ 'if x then', 'end' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('n', { 'print(1)' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'n',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if x then', '    print(1)', 'end' })
+    delete_buf(bufnr)
+  end)
+
   case(']p with blockwise register falls through to vanilla paste', function()
     local bufnr = make_buf({ 'alpha', 'beta' })
     vim.api.nvim_set_current_buf(bufnr)
