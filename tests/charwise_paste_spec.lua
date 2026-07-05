@@ -490,6 +490,65 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case(']p reconstructs an indented opener block base so the body is not over-indented (issue #17)', function()
+    -- A charwise yank of an indented for-block drops the `for` line's indent
+    -- but its body keeps its absolute depth. The opener's own indent must be
+    -- rebuilt one level below the body, otherwise the body lands two levels
+    -- deep instead of one when pasted as a sibling statement.
+    local bufnr = make_buf({ 'def outer():', '    for foo in bar:', '        x = baz()', '        y = blah()' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('x', { 'for foo in bar:', '        x = baz()', '        y = blah()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 4, 0 })
+    paste._test_set_state({
+      register = 'x',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), {
+      'def outer():',
+      '    for foo in bar:',
+      '        x = baz()',
+      '        y = blah()',
+      '        for foo in bar:',
+      '            x = baz()',
+      '            y = blah()',
+    })
+    delete_buf(bufnr)
+  end)
+
+  case(']p rebuilds an indented opener block base with tabs (issue #17)', function()
+    -- Same defect exercised with a tab-indented python block, matching the
+    -- reported Flash-yank of a `for` statement nested inside an `if`.
+    local bufnr = make_buf({ 'if smart:', '\tfor foo in bar:', '\t\tx = baz()', '\t\ty = blah()' })
+    vim.bo[bufnr].expandtab = false
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('y', { 'for foo in bar:', '\t\tx = baz()', '\t\ty = blah()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 4, 0 })
+    paste._test_set_state({
+      register = 'y',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), {
+      'if smart:',
+      '\tfor foo in bar:',
+      '\t\tx = baz()',
+      '\t\ty = blah()',
+      '\t\tfor foo in bar:',
+      '\t\t\tx = baz()',
+      '\t\t\ty = blah()',
+    })
+    delete_buf(bufnr)
+  end)
+
   case(']p still nests inner lines under a brace opener first line', function()
     -- An opener-looking first line keeps the nesting guess: the body stays one
     -- level inside the block after the rebase.

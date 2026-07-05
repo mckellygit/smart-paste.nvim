@@ -54,8 +54,10 @@ end
 --- or brace), or when the first line does not look like a scope opener, the
 --- first line most likely sat at the block's minimum inner indent (siblings);
 --- re-pad it to that base so the uniform shift preserves the block's relative
---- structure. Opener-looking (e.g. `if x:`) or blank first lines of blocks
---- that never dedent keep the first line at column 0, inner lines nested.
+--- structure. For an opener-looking (e.g. `if x:`) first line of a block that
+--- never dedents, reconstruct the opener's own indent as one level below the
+--- shallowest inner line, so an indented source block is not over-indented by
+--- its original depth. A blank first line keeps column 0.
 --- @param lines string[] Lines with the first line already left-stripped
 --- @param bufnr? integer Buffer whose options drive the opener heuristics (defaults to current buffer)
 --- @return string[] rebased New table; first line padded to the detected base
@@ -84,6 +86,14 @@ function M.rebase_charwise_block(lines, bufnr)
   if first_inner ~= nil and (min_inner < first_inner or first_is_sibling) then
     result[1] = string.rep(' ', min_inner) .. result[1]
     return result, min_inner
+  end
+  if first_inner ~= nil then
+    -- Opener block that never dedents: rebuild the opener's own indent, one
+    -- level below the shallowest inner line, so an indented source block is
+    -- not over-indented by its original depth.
+    local base = math.max(0, min_inner - get_shiftwidth(bufnr))
+    result[1] = string.rep(' ', base) .. result[1]
+    return result, base
   end
   return result, 0
 end
