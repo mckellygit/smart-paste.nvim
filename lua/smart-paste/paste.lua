@@ -213,8 +213,8 @@ function M.do_paste(_motion_type)
       -- Charwise selections drop the first line's indent but keep the inner
       -- lines' absolute indent; rebase the first line so the block's relative
       -- structure survives the shift to the target indent.
-      local rebased, source_indent = indent.rebase_charwise_block(stripped)
       local bufnr = vim.api.nvim_get_current_buf()
+      local rebased, source_indent = indent.rebase_charwise_block(stripped, bufnr)
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1 -- 0-indexed
       local target_indent = resolve_linewise_target_indent(bufnr, row, after)
       local delta = target_indent - source_indent
