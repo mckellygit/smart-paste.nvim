@@ -1,6 +1,7 @@
 --- @class SmartPaste.Paste
 local M = {}
 local indent = require('smart-paste.indent')
+local heuristics = require('smart-paste.heuristics')
 
 -- Module-level state: captured BEFORE g@l fires (v:register and v:count1 reset after)
 local state = {}
@@ -75,69 +76,6 @@ local function get_shiftwidth(bufnr)
   return sw
 end
 
---- Heuristic: line opens an HTML/Vue-like tag block.
---- Supports single-line tag openers and multiline opener tails (`>` line).
---- A complete element closed on the same line (e.g. JSX `<li>x</li>`) is not an opener.
---- @param line string
---- @return boolean
-local function looks_like_tag_opener(line)
-  if line:match('^%s*>%s*$') then
-    return true
-  end
-  if line:match('^%s*<[%w:_-]') and line:match('>%s*$') and not line:match('/>%s*$') and not line:match('</') then
-    return true
-  end
-  return false
-end
-
---- Heuristic: line closes an HTML/Vue-like tag block.
---- @param line string
---- @return boolean
-local function looks_like_tag_closer(line)
-  return line:match('^%s*</[%w:_-][^>]*>%s*$') ~= nil
-end
-
-local SCOPE_OPENER_KEYWORDS = { 'then', 'do', 'else', 'elseif', 'repeat', 'function' }
-local SCOPE_CLOSER_KEYWORDS = { 'end', 'elif', 'else', 'elseif', 'catch', 'finally' }
-
---- Heuristic: line ends with an opener token for block-like constructs.
---- @param line string
---- @return boolean
-local function looks_like_scope_opener(line)
-  if line:match('[%{%[%(:]%s*$') then
-    return true
-  end
-  if looks_like_tag_opener(line) then
-    return true
-  end
-  -- Lua patterns have no alternation; test each keyword separately.
-  for _, keyword in ipairs(SCOPE_OPENER_KEYWORDS) do
-    if line:match('%f[%a]' .. keyword .. '%s*$') then
-      return true
-    end
-  end
-  return false
-end
-
---- Heuristic: line begins with a closing token for block-like constructs.
---- @param line string
---- @return boolean
-local function looks_like_scope_closer(line)
-  if line:match('^%s*[%}%]%)]') then
-    return true
-  end
-  if looks_like_tag_closer(line) then
-    return true
-  end
-  -- Lua patterns have no alternation; test each keyword separately.
-  for _, keyword in ipairs(SCOPE_CLOSER_KEYWORDS) do
-    if line:match('^%s*' .. keyword .. '%f[%A]') then
-      return true
-    end
-  end
-  return false
-end
-
 --- Resolve target indent for linewise insertion at the current cursor gap.
 --- Uses neighbor context only around likely scope boundaries so ordinary
 --- top-level/adjacent indentation remains stable.
@@ -156,7 +94,7 @@ local function resolve_linewise_target_indent(bufnr, cursor_row, after)
 
   if after then
     local next_row = clamped_row + 1
-    if next_row < line_count and looks_like_scope_opener(current_line) then
+    if next_row < line_count and heuristics.is_scope_opener(current_line, bufnr) then
       local next_indent, next_line = resolve_row_context_indent(bufnr, next_row)
       if next_indent > current_indent then
         return next_indent
@@ -165,7 +103,7 @@ local function resolve_linewise_target_indent(bufnr, cursor_row, after)
         return current_indent + get_shiftwidth(bufnr)
       end
       -- Empty block case: opener followed by a closer at same indent.
-      if looks_like_scope_closer(next_line) and next_indent <= current_indent then
+      if heuristics.is_scope_closer(next_line, bufnr) and next_indent <= current_indent then
         return current_indent + get_shiftwidth(bufnr)
       end
     end
@@ -173,7 +111,7 @@ local function resolve_linewise_target_indent(bufnr, cursor_row, after)
   end
 
   local prev_row = clamped_row - 1
-  if prev_row >= 0 and looks_like_scope_closer(current_line) then
+  if prev_row >= 0 and heuristics.is_scope_closer(current_line, bufnr) then
     local prev_indent, prev_line = resolve_row_context_indent(bufnr, prev_row)
     if prev_indent > current_indent then
       return prev_indent
@@ -182,7 +120,7 @@ local function resolve_linewise_target_indent(bufnr, cursor_row, after)
       return current_indent + get_shiftwidth(bufnr)
     end
     -- Empty block case: closer preceded by an opener at same indent.
-    if looks_like_scope_opener(prev_line) and prev_indent <= current_indent then
+    if heuristics.is_scope_opener(prev_line, bufnr) and prev_indent <= current_indent then
       return current_indent + get_shiftwidth(bufnr)
     end
   end

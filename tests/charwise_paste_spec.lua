@@ -185,6 +185,111 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case('p below a python opener with a trailing comment indents into the block (issue #19)', function()
+    -- Regression: an inline comment after the colon hid the opener token, so
+    -- the paste landed at column 0 instead of inside the if block.
+    local bufnr = make_buf({ 'if foo < bar: # some comment', '    baz()' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('o', { 'x = 1' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'o',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = false,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if foo < bar: # some comment', '    x = 1', '    baz()' })
+    delete_buf(bufnr)
+  end)
+
+  case('p below a lua keyword opener with a trailing comment indents into the block (issue #19)', function()
+    -- Same defect for keyword openers: `then` followed by an inline `--`
+    -- comment must still read as a scope opener.
+    local bufnr = make_buf({ 'if x then -- note', 'end' })
+    vim.bo[bufnr].commentstring = '-- %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('q', { 'print(1)' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'q',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = false,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if x then -- note', '    print(1)', 'end' })
+    delete_buf(bufnr)
+  end)
+
+  case('P above a commented elif still indents into the if block (issue #19)', function()
+    -- The elif line is a keyword scope closer; a trailing comment on it must
+    -- not stop the paste from targeting the enclosing block body indent.
+    local bufnr = make_buf({ 'if foo:', 'elif baz: # note', '    blah()' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('r', { '    bar()' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 'r',
+      count = 1,
+      key = 'P',
+      after = false,
+      follow = false,
+      charwise_newline = false,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if foo:', '    bar()', 'elif baz: # note', '    blah()' })
+    delete_buf(bufnr)
+  end)
+
+  case('P above a closer whose opener carries a trailing comment indents into the block (issue #19)', function()
+    -- Empty-block closer branch: the opener check runs on the previous line,
+    -- so a comment there hid the `:` and the paste stayed at column 0.
+    local bufnr = make_buf({ 'if foo: # setup', 'elif baz:', '    blah()' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('s', { '    bar()' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 's',
+      count = 1,
+      key = 'P',
+      after = false,
+      follow = false,
+      charwise_newline = false,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'if foo: # setup', '    bar()', 'elif baz:', '    blah()' })
+    delete_buf(bufnr)
+  end)
+
+  case('p on a full-line comment keeps the current indent and does not error', function()
+    -- A comment leader at the start of the line is not a trailing comment;
+    -- the heuristics must leave the line alone and paste at its own indent.
+    local bufnr = make_buf({ '# just a comment', 'x = 1' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('t', { 'y = 2' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 't',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = false,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { '# just a comment', 'y = 2', 'x = 1' })
+    delete_buf(bufnr)
+  end)
+
   case(']p with blockwise register falls through to vanilla paste', function()
     local bufnr = make_buf({ 'alpha', 'beta' })
     vim.api.nvim_set_current_buf(bufnr)

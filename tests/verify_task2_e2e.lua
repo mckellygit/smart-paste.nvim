@@ -236,21 +236,23 @@ if top_level_count ~= 1 or scoped_count ~= 1 then
 end
 print('PASS: dot-repeat replays smart paste with new-context indentation')
 
--- Test 9: Verify all 3 modules integrate without error
+-- Test 9: Verify all 4 modules integrate without error
 local init_ok = package.loaded['smart-paste'] ~= nil
 local paste_ok = package.loaded['smart-paste.paste'] ~= nil
 local indent_ok = package.loaded['smart-paste.indent'] ~= nil
+local heuristics_ok = package.loaded['smart-paste.heuristics'] ~= nil
 assert(init_ok, 'init module not loaded')
 assert(paste_ok, 'paste module not loaded')
 assert(indent_ok, 'indent module not loaded')
-print('PASS: all 3 modules (init, paste, indent) loaded and integrated')
+assert(heuristics_ok, 'heuristics module not loaded')
+print('PASS: all 4 modules (init, paste, indent, heuristics) loaded and integrated')
 
 -- Test 10: Plugin file count check
 local handle = io.popen('ls lua/smart-paste/*.lua | wc -l')
 local file_count = tonumber(handle:read('*a'):match('%d+'))
 handle:close()
-assert(file_count == 3, 'expected 3 lua files, got ' .. file_count)
-print('PASS: plugin has exactly 3 Lua files')
+assert(file_count == 4, 'expected 4 lua files, got ' .. file_count)
+print('PASS: plugin has exactly 4 Lua files')
 
 -- Test 11: File size check (focused, minimal modules)
 local lua_files = { 'lua/smart-paste/init.lua', 'lua/smart-paste/paste.lua', 'lua/smart-paste/indent.lua' }
