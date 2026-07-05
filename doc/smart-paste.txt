@@ -120,11 +120,26 @@ Example custom bindings:
   Keys to remap in normal mode. Accepts flat strings and structured entries.
   String values: `p`, `P`, `gp`, `gP`, `]p`, `[p`.
   Structured form:
-    { lhs = 'key', after = bool, follow = bool, charwise_newline = bool }
+    { lhs = 'key', after = bool, follow = bool, charwise_newline = value }
   Alias form:
     { lhs = 'key', like = ']p' }
   where `like` may be one of: `p`, `P`, `gp`, `gP`, `]p`, `[p`.
   Mixed formats are supported. Visual mode uses only `p` and `P`.
+
+  `charwise_newline` values:
+  - `true`        always convert charwise pastes to an indented new line
+                  (like `]p`)
+  - `false`       never convert; charwise pastes stay inline
+  - `'multiline'` convert only when the yank spans multiple lines, so a
+                  single yanked word still pastes inline:
+>
+    require('smart-paste').setup({
+      keys = {
+        { lhs = 'p', like = 'p', charwise_newline = 'multiline' },
+        { lhs = 'P', like = 'P', charwise_newline = 'multiline' },
+      },
+    })
+<
 
 `exclude_filetypes` (string[])
   Filetypes where smart paste is bypassed and vanilla paste is used.

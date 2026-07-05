@@ -167,9 +167,10 @@ end
 --- Reads the register (never mutates it), computes indent delta for
 --- linewise content, and places text via a single `nvim_put` call
 --- for undo atomicity. When `charwise_newline` is enabled for a key entry,
---- charwise register content is converted to indented linewise paste.
---- Other charwise/blockwise operations fall through to vanilla paste via
---- `nvim_feedkeys`.
+--- charwise register content is converted to indented linewise paste;
+--- the `'multiline'` value applies the conversion only when the register
+--- effectively spans more than one line. Other charwise/blockwise
+--- operations fall through to vanilla paste via `nvim_feedkeys`.
 ---
 --- @param _motion_type string Ignored; required by operatorfunc signature
 function M.do_paste(_motion_type)
@@ -204,11 +205,21 @@ function M.do_paste(_motion_type)
   local is_linewise = vim.startswith(reginfo.regtype, 'V')
 
   if not is_linewise then
-    local charwise_newline = state.charwise_newline == true
+    local newline_mode = state.charwise_newline
     local is_charwise = (reginfo.regtype == 'v')
 
-    if charwise_newline and is_charwise then
-      local lines = strip_trailing_blank_lines(reginfo.regcontents)
+    local lines
+    if is_charwise and (newline_mode == true or newline_mode == 'multiline') then
+      lines = strip_trailing_blank_lines(reginfo.regcontents)
+      -- 'multiline' converts only when the yank effectively spans more than
+      -- one line. The count is taken after dropping the `v$` trailing blank,
+      -- so a single yanked word (or line) keeps the vanilla inline paste.
+      if newline_mode == 'multiline' and #lines <= 1 then
+        lines = nil
+      end
+    end
+
+    if lines then
       local stripped = strip_leading_whitespace(lines)
       -- Charwise selections drop the first line's indent but keep the inner
       -- lines' absolute indent; rebase the first line so the block's relative

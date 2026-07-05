@@ -511,6 +511,108 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case("p with charwise_newline = 'multiline' converts a multiline charwise yank to linewise", function()
+    -- Issue #18: the 'multiline' mode makes p behave like ]p only when the
+    -- charwise yank spans multiple lines.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('w', { 'bar()', '    baz()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'w',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = 'multiline',
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'x = 1', 'bar()', 'baz()', '' })
+    delete_buf(bufnr)
+  end)
+
+  case("p with charwise_newline = 'multiline' pastes a single-line yank inline", function()
+    -- A single yanked word must keep the vanilla inline paste instead of
+    -- being forced onto its own line.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.api.nvim_set_current_buf(bufnr)
+    local orig_feedkeys = vim.api.nvim_feedkeys
+    local calls = 0
+    vim.api.nvim_feedkeys = function(...)
+      calls = calls + 1
+      return nil
+    end
+
+    vim.fn.setreg('x', 'word', 'v')
+    paste._test_set_state({
+      register = 'x',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = 'multiline',
+    })
+    paste.do_paste('line')
+
+    vim.api.nvim_feedkeys = orig_feedkeys
+    if calls ~= 1 then
+      delete_buf(bufnr)
+      error('expected one vanilla fallback call for a single-line charwise register')
+    end
+    delete_buf(bufnr)
+  end)
+
+  case("p with charwise_newline = 'multiline' treats a v$ trailing blank as single-line", function()
+    -- A `v$` yank of one line captures the trailing newline as an empty
+    -- entry; the effective line count is taken after dropping it, so the
+    -- paste still falls through inline.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.api.nvim_set_current_buf(bufnr)
+    local orig_feedkeys = vim.api.nvim_feedkeys
+    local calls = 0
+    vim.api.nvim_feedkeys = function(...)
+      calls = calls + 1
+      return nil
+    end
+
+    vim.fn.setreg('y', { 'word', '' }, 'v')
+    paste._test_set_state({
+      register = 'y',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = 'multiline',
+    })
+    paste.do_paste('line')
+
+    vim.api.nvim_feedkeys = orig_feedkeys
+    if calls ~= 1 then
+      delete_buf(bufnr)
+      error('expected one vanilla fallback call for a v$ single-line charwise register')
+    end
+    delete_buf(bufnr)
+  end)
+
+  case("p with charwise_newline = 'multiline' keeps the smart linewise path for linewise registers", function()
+    local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('z', { 'item' }, 'V')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 'z',
+      count = 1,
+      key = 'p',
+      after = true,
+      follow = false,
+      charwise_newline = 'multiline',
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'def foo():', '    x = 1', '    item', '' })
+    delete_buf(bufnr)
+  end)
+
   case(']p with empty charwise register does not crash', function()
     local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
     vim.api.nvim_set_current_buf(bufnr)
