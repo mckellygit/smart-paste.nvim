@@ -103,6 +103,17 @@ require('smart-paste').setup({
 })
 ```
 
+`charwise_newline` controls what happens when the register holds charwise content: `true` always converts the paste to an indented new line (like `]p`), `false` never does, and `'multiline'` converts only when the yank spans multiple lines, so a single yanked word still pastes inline:
+
+```lua
+require('smart-paste').setup({
+  keys = {
+    { lhs = 'p', like = 'p', charwise_newline = 'multiline' },
+    { lhs = 'P', like = 'P', charwise_newline = 'multiline' },
+  },
+})
+```
+
 Shorthand remap by inheriting behavior from a built-in key:
 
 ```lua

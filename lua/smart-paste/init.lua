@@ -4,7 +4,7 @@ local M = {}
 --- @class SmartPasteKeyFlags
 --- @field after boolean
 --- @field follow boolean
---- @field charwise_newline boolean
+--- @field charwise_newline boolean|'multiline'
 
 --- @class SmartPasteKeyEntry : SmartPasteKeyFlags
 --- @field lhs string
@@ -14,7 +14,7 @@ local M = {}
 --- @field like? string
 --- @field after? boolean
 --- @field follow? boolean
---- @field charwise_newline? boolean
+--- @field charwise_newline? boolean|'multiline'
 
 --- @class SmartPasteConfig
 --- @field keys SmartPasteKeyEntry[]
@@ -86,6 +86,8 @@ end
 
 --- Normalize a key config entry to a canonical table shape.
 --- Accepts legacy string entries and structured table entries.
+--- `charwise_newline` accepts `true`, `false`, or `'multiline'`; any other
+--- value falls back to the `like` preset (or `false`).
 --- Invalid entries are skipped by returning nil.
 --- @param entry string|SmartPasteKeyInput
 --- @return SmartPasteKeyEntry|nil normalized_key_entry
@@ -129,6 +131,9 @@ local function normalize_key_entry(entry)
     end
 
     local charwise_newline = entry.charwise_newline
+    if charwise_newline ~= true and charwise_newline ~= false and charwise_newline ~= 'multiline' then
+      charwise_newline = nil
+    end
     if charwise_newline == nil and like_flags then
       charwise_newline = like_flags.charwise_newline
     end
