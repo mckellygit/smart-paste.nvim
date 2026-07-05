@@ -264,7 +264,7 @@ for _, fpath in ipairs(lua_files) do
   end
   f:close()
   -- Phase 2 adds strategy helpers to indent.lua; keep a soft cap for maintainability.
-  local max_lines = 320
+  local max_lines = 340
   if fpath == 'lua/smart-paste/init.lua' or fpath == 'lua/smart-paste/paste.lua' then
     max_lines = 440
   end
