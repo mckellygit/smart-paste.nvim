@@ -1,6 +1,8 @@
 --- @class SmartPaste.Indent
 local M = {}
 
+local heuristics = require('smart-paste.heuristics')
+
 --- Check whether a line is empty or whitespace-only.
 --- @param line string
 --- @return boolean blank
@@ -47,15 +49,19 @@ end
 --- Reconstruct the first line's indentation for a charwise "paste as new line".
 --- A charwise selection drops the first line's leading whitespace while inner
 --- lines keep their absolute indent, so a single uniform shift over-indents the
---- inner lines by the block's original base. When the block dedents back below
---- its first inner line (e.g. a closing tag or brace), the first line is an
---- opener whose base equals the block's minimum inner indent; re-pad it to that
---- base so the uniform shift preserves the block's relative structure. Blocks
---- that never dedent (e.g. `if x:` + body) keep the first line at column 0.
+--- inner lines by the block's original base. The lost indent forces a guess:
+--- when the block dedents back below its first inner line (e.g. a closing tag
+--- or brace), or when the first line does not look like a scope opener, the
+--- first line most likely sat at the block's minimum inner indent (siblings);
+--- re-pad it to that base so the uniform shift preserves the block's relative
+--- structure. Opener-looking (e.g. `if x:`) or blank first lines of blocks
+--- that never dedent keep the first line at column 0, inner lines nested.
 --- @param lines string[] Lines with the first line already left-stripped
+--- @param bufnr? integer Buffer whose options drive the opener heuristics (defaults to current buffer)
 --- @return string[] rebased New table; first line padded to the detected base
 --- @return integer base Visual-column base indent to use as the source indent
-function M.rebase_charwise_block(lines)
+function M.rebase_charwise_block(lines, bufnr)
+  bufnr = bufnr or 0
   local result = vim.deepcopy(lines)
   if #result == 0 then
     return result, 0
@@ -74,7 +80,8 @@ function M.rebase_charwise_block(lines)
     end
   end
 
-  if first_inner ~= nil and min_inner < first_inner then
+  local first_is_sibling = not is_blank(result[1]) and not heuristics.is_scope_opener(result[1], bufnr)
+  if first_inner ~= nil and (min_inner < first_inner or first_is_sibling) then
     result[1] = string.rep(' ', min_inner) .. result[1]
     return result, min_inner
   end

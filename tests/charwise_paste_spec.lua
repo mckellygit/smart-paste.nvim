@@ -426,6 +426,91 @@ group('charwise_paste', function()
     delete_buf(bufnr)
   end)
 
+  case(']p levels sibling lines when the first charwise line is not an opener (issue #17)', function()
+    -- A mid-line charwise yank of two sibling statements drops line 1's
+    -- indent; the old rebase always nested the inner lines under line 1,
+    -- over-indenting baz() by the block's original base.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('j', { 'bar()', '    baz()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'j',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'x = 1', 'bar()', 'baz()', '' })
+    delete_buf(bufnr)
+  end)
+
+  case(']p keeps charwise siblings level at an indented target (issue #17)', function()
+    -- Same sibling block pasted inside a function body: both lines must land
+    -- at the body indent, not one level apart.
+    local bufnr = make_buf({ 'def f():', '    x = 1', '' })
+    vim.bo[bufnr].commentstring = '# %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('u', { 'bar()', '    baz()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    paste._test_set_state({
+      register = 'u',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'def f():', '    x = 1', '    bar()', '    baz()', '' })
+    delete_buf(bufnr)
+  end)
+
+  case(']p keeps a blank first charwise line blank instead of padding it', function()
+    -- A charwise yank starting on an empty line carries no sibling evidence;
+    -- the first line must stay blank, not become a whitespace-only line with
+    -- the inner lines flattened to it.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('w', { '', '    baz()', '' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'w',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'x = 1', '', '    baz()', '' })
+    delete_buf(bufnr)
+  end)
+
+  case(']p still nests inner lines under a brace opener first line', function()
+    -- An opener-looking first line keeps the nesting guess: the body stays one
+    -- level inside the block after the rebase.
+    local bufnr = make_buf({ 'x = 1', '' })
+    vim.bo[bufnr].commentstring = '// %s'
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.fn.setreg('v', { 'function foo() {', '    body()' }, 'v')
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    paste._test_set_state({
+      register = 'v',
+      count = 1,
+      key = ']p',
+      after = true,
+      follow = false,
+      charwise_newline = true,
+    })
+    paste.do_paste('line')
+    assert_eq(get_lines(bufnr), { 'x = 1', 'function foo() {', '    body()', '' })
+    delete_buf(bufnr)
+  end)
+
   case(']p with empty charwise register does not crash', function()
     local bufnr = make_buf({ 'def foo():', '    x = 1', '' })
     vim.api.nvim_set_current_buf(bufnr)
