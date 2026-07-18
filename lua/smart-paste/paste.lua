@@ -257,29 +257,36 @@ function M.do_paste(_motion_type)
   vim.api.nvim_put(final_lines, 'l', after, follow)
 end
 
+--- Feed a native paste over the last visual selection.
+--- Always feeds `P` no matter which key was pressed. In visual mode `p` and
+--- `P` place text identically, but `P` leaves registers untouched, so the
+--- replaced selection never overwrites the register being pasted from.
+--- @param reg string Register name
+local function feed_native_visual_paste(reg)
+  local raw_keys = 'gv"' .. reg .. 'P'
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(raw_keys, true, false, true), 'n', false)
+end
+
 --- Perform smart visual-mode paste for a previously selected region.
 --- Supports smart indentation only for linewise visual mode (`V`), and falls
---- back to vanilla visual paste for charwise/blockwise selections.
+--- back to native visual paste for charwise/blockwise selections. Both the
+--- smart path and the fallback preserve register contents.
 ---
 --- The caller is expected to exit visual mode before invoking this function so
 --- that `'<` and `'>` marks represent the latest visual selection.
 ---
 --- @param reg string Register name
---- @param key string Paste key (`p` or `P`)
+--- @param _key string Pressed paste key. Unused, `p` and `P` behave the same in visual mode.
 --- @param vmode string Visual mode kind (`v`, `V`, or blockwise)
 --- @param count_override? number Optional count override (test helper)
-function M.do_visual_paste(reg, key, vmode, count_override)
+function M.do_visual_paste(reg, _key, vmode, count_override)
   if not reg or reg == '' then
     reg = '"'
-  end
-  if not key or key == '' then
-    key = 'p'
   end
 
   -- Gate: only linewise visual selections get smart indentation.
   if vmode ~= 'V' then
-    local raw_keys = 'gv"' .. reg .. key
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(raw_keys, true, false, true), 'n', false)
+    feed_native_visual_paste(reg)
     return
   end
 
@@ -293,8 +300,7 @@ function M.do_visual_paste(reg, key, vmode, count_override)
   -- Charwise/blockwise registers fall through to native visual paste.
   local is_linewise_register = type(reginfo.regtype) == 'string' and vim.startswith(reginfo.regtype, 'V')
   if not is_linewise_register then
-    local raw_keys = 'gv"' .. reg .. key
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(raw_keys, true, false, true), 'n', false)
+    feed_native_visual_paste(reg)
     return
   end
 

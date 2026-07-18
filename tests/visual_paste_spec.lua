@@ -129,20 +129,22 @@ group('visual_paste', function()
     vim.api.nvim_set_current_buf(bufnr)
 
     local orig_feedkeys = vim.api.nvim_feedkeys
-    local calls = 0
-    vim.api.nvim_feedkeys = function(...)
-      calls = calls + 1
-      return orig_feedkeys(...)
+    local fed_keys = nil
+    -- Pure mock. Do not forward to the real feedkeys, otherwise the paste
+    -- keys stay queued in typeahead and leak into later tests.
+    vim.api.nvim_feedkeys = function(keys)
+      fed_keys = keys
     end
 
     vim.fn.setreg('c', 'XX', 'v')
     paste.do_visual_paste('c', 'p', 'v')
 
     vim.api.nvim_feedkeys = orig_feedkeys
-    if calls == 0 then
+    if not fed_keys then
       delete_buf(bufnr)
       error('expected vanilla fallback to call nvim_feedkeys')
     end
+    assert_eq(fed_keys, 'gv"cP', 'fallback should paste with register-preserving P')
     delete_buf(bufnr)
   end)
 
@@ -152,20 +154,22 @@ group('visual_paste', function()
     set_selection(bufnr, 1, 2)
 
     local orig_feedkeys = vim.api.nvim_feedkeys
-    local calls = 0
-    vim.api.nvim_feedkeys = function(...)
-      calls = calls + 1
-      return orig_feedkeys(...)
+    local fed_keys = nil
+    -- Pure mock. Do not forward to the real feedkeys, otherwise the paste
+    -- keys stay queued in typeahead and leak into later tests.
+    vim.api.nvim_feedkeys = function(keys)
+      fed_keys = keys
     end
 
     vim.fn.setreg('z', 'XX', 'v')
     paste.do_visual_paste('z', 'p', 'V')
 
     vim.api.nvim_feedkeys = orig_feedkeys
-    if calls == 0 then
+    if not fed_keys then
       delete_buf(bufnr)
       error('expected charwise register in linewise visual mode to call nvim_feedkeys')
     end
+    assert_eq(fed_keys, 'gv"zP', 'fallback should paste with register-preserving P')
     delete_buf(bufnr)
   end)
 
@@ -174,20 +178,43 @@ group('visual_paste', function()
     vim.api.nvim_set_current_buf(bufnr)
 
     local orig_feedkeys = vim.api.nvim_feedkeys
-    local calls = 0
-    vim.api.nvim_feedkeys = function(...)
-      calls = calls + 1
-      return orig_feedkeys(...)
+    local fed_keys = nil
+    -- Pure mock. Do not forward to the real feedkeys, otherwise the paste
+    -- keys stay queued in typeahead and leak into later tests.
+    vim.api.nvim_feedkeys = function(keys)
+      fed_keys = keys
     end
 
     vim.fn.setreg('d', { 'YY' }, '\0222')
     paste.do_visual_paste('d', 'p', '\022')
 
     vim.api.nvim_feedkeys = orig_feedkeys
-    if calls == 0 then
+    if not fed_keys then
       delete_buf(bufnr)
       error('expected blockwise fallback to call nvim_feedkeys')
     end
+    assert_eq(fed_keys, 'gv"dP', 'fallback should paste with register-preserving P')
+    delete_buf(bufnr)
+  end)
+
+  case('charwise fallback paste preserves register contents', function()
+    local bufnr = make_buf({ 'alpha', 'beta' })
+    vim.api.nvim_set_current_buf(bufnr)
+
+    vim.fn.setreg('c', 'XX', 'v')
+    -- Make a real charwise selection over "alpha" so gv can restore it.
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    vim.cmd.normal({ args = { 've\27' }, bang = true })
+    local before = snapshot_registers()
+
+    paste.do_visual_paste('c', 'p', 'v')
+    -- The fallback queues keys through nvim_feedkeys. Flush them so the
+    -- paste actually runs before we compare registers.
+    vim.api.nvim_feedkeys('', 'x', false)
+
+    assert_eq(get_lines(bufnr), { 'XX', 'beta' })
+    local after = snapshot_registers()
+    assert_eq(after, before, 'fallback paste should not rewrite registers')
     delete_buf(bufnr)
   end)
 

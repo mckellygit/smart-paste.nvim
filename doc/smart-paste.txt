@@ -99,7 +99,9 @@ Default normal-mode mappings:
 Default visual-mode mappings:
 - `p`   replace linewise visual selection with smart-indented linewise content
 - `P`   same replacement behavior (linewise visual mode)
-       (charwise/blockwise source registers fall through to native paste)
+       (charwise/blockwise selections and source registers fall through to
+        native paste, fed as `P` so the replaced text never overwrites
+        registers)
 
 Escape hatches (vanilla behavior):
 - `<Plug>(smart-paste-raw-p)`
@@ -174,6 +176,7 @@ For charwise `]p`/`[p` conversion:
 Visual linewise replacement:
 1. Read register
 2. If register is not linewise, fall through to native visual paste
+   (fed as `P`, which does not overwrite registers)
 3. Delete selected lines with `nvim_buf_set_lines()`
 4. Insert adjusted lines with `nvim_put()`
 
@@ -189,7 +192,9 @@ How do `]p` and `[p` differ from regular `p`/`P`?
   behavior for charwise registers.
 
 Does this plugin modify registers?
-  No. Register content is read and transformed in memory only.
+  No. Register content is read and transformed in memory only. This includes
+  visual paste, where the text you paste over is never written back into a
+  register (native visual `p` would put it in the unnamed register).
 
 Why does visual mode smart paste focus on linewise (`V`) selection?
   It preserves predictable indentation semantics and avoids block/column
