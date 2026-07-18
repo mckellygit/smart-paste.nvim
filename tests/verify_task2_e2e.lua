@@ -158,7 +158,7 @@ do
     put_calls = put_calls + 1
     return orig_put(...)
   end
-  vim.api.nvim_feedkeys = function(...)
+  vim.api.nvim_feedkeys = function()
     feed_calls = feed_calls + 1
     return nil
   end
@@ -320,7 +320,7 @@ do
 
   local orig_feedkeys = vim.api.nvim_feedkeys
   local feed_calls = 0
-  vim.api.nvim_feedkeys = function(...)
+  vim.api.nvim_feedkeys = function()
     feed_calls = feed_calls + 1
     return nil
   end
@@ -401,7 +401,7 @@ print('PASS: [p charwise-to-newline inserts above cursor')
 do
   local orig_feedkeys = vim.api.nvim_feedkeys
   local feed_calls = 0
-  vim.api.nvim_feedkeys = function(...)
+  vim.api.nvim_feedkeys = function()
     feed_calls = feed_calls + 1
     return nil
   end

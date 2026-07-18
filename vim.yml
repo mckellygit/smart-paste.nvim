@@ -16,3 +16,11 @@ globals:
     any: true
   assert:
     any: true
+  assert.are:
+    any: true
+  assert.are_not:
+    any: true
+  assert.is_true:
+    any: true
+  assert.is_false:
+    any: true

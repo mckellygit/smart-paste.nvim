@@ -295,7 +295,7 @@ group('charwise_paste', function()
     vim.api.nvim_set_current_buf(bufnr)
     local orig_feedkeys = vim.api.nvim_feedkeys
     local calls = 0
-    vim.api.nvim_feedkeys = function(...)
+    vim.api.nvim_feedkeys = function()
       calls = calls + 1
       return nil
     end
@@ -598,7 +598,7 @@ group('charwise_paste', function()
     vim.api.nvim_set_current_buf(bufnr)
     local orig_feedkeys = vim.api.nvim_feedkeys
     local calls = 0
-    vim.api.nvim_feedkeys = function(...)
+    vim.api.nvim_feedkeys = function()
       calls = calls + 1
       return nil
     end
@@ -630,7 +630,7 @@ group('charwise_paste', function()
     vim.api.nvim_set_current_buf(bufnr)
     local orig_feedkeys = vim.api.nvim_feedkeys
     local calls = 0
-    vim.api.nvim_feedkeys = function(...)
+    vim.api.nvim_feedkeys = function()
       calls = calls + 1
       return nil
     end
