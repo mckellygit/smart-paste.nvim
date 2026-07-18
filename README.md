@@ -144,6 +144,7 @@ Smart paste applies to linewise registers (for example: `yy`, `dd`, `2yy`, or li
 For charwise registers, `]p` and `[p` convert inline content into smart-indented new lines.
 Characterwise paste on `p`/`P`/`gp`/`gP` and blockwise (`<C-v>`) paste use native Neovim behavior.
 Visual `V` + `p`/`P` also falls back to native behavior when the source register is charwise or blockwise.
+Visual fallbacks are fed as native `P`, so the text you paste over never overwrites the register. This matches the smart path, where registers are read but never rewritten.
 
 Example escape-hatch bindings:
 
