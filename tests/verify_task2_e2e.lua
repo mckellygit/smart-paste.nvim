@@ -308,13 +308,13 @@ if not x_found_p or not x_found_P then
 end
 print('PASS: x-mode keymaps for visual paste are registered')
 
--- Test 13b: visual linewise paste with charwise register falls through to vanilla
+-- Test 13b: visual linewise paste with blockwise register falls through to vanilla
 do
   set_buf_lines({
     'alpha',
     'beta',
   })
-  vim.fn.setreg('j2', 'XX', 'v')
+  vim.fn.setreg('j2', { 'XX', 'YY' }, 'b')
   vim.api.nvim_buf_set_mark(0, '<', 1, 0, {})
   vim.api.nvim_buf_set_mark(0, '>', 2, 0, {})
 
@@ -329,10 +329,10 @@ do
   vim.api.nvim_feedkeys = orig_feedkeys
 
   if feed_calls ~= 1 then
-    error('visual linewise paste with charwise register should use vanilla fallback')
+    error('visual linewise paste with blockwise register should use vanilla fallback')
   end
 end
-print('PASS: visual linewise paste with charwise register falls through to vanilla')
+print('PASS: visual linewise paste with blockwise register falls through to vanilla')
 
 -- Test 13c: visual linewise paste on nonblank row ignores noisy indentexpr
 set_buf_lines({

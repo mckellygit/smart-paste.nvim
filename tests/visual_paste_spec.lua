@@ -148,7 +148,7 @@ group('visual_paste', function()
     delete_buf(bufnr)
   end)
 
-  case('linewise visual mode with charwise register falls through to vanilla path', function()
+  case('linewise visual mode with blockwise register falls through to vanilla path', function()
     local bufnr = make_buf({ 'alpha', 'beta' })
     vim.api.nvim_set_current_buf(bufnr)
     set_selection(bufnr, 1, 2)
@@ -161,15 +161,66 @@ group('visual_paste', function()
       fed_keys = keys
     end
 
-    vim.fn.setreg('z', 'XX', 'v')
+    vim.fn.setreg('z', { 'XX', 'YY' }, 'b')
     paste.do_visual_paste('z', 'p', 'V')
 
     vim.api.nvim_feedkeys = orig_feedkeys
     if not fed_keys then
       delete_buf(bufnr)
-      error('expected charwise register in linewise visual mode to call nvim_feedkeys')
+      error('expected blockwise register in linewise visual mode to call nvim_feedkeys')
     end
     assert_eq(fed_keys, 'gv"zP', 'fallback should paste with register-preserving P')
+    delete_buf(bufnr)
+  end)
+
+  case('linewise visual paste reindents a multi-line charwise register', function()
+    local bufnr = make_buf({ 'def foo():', '    x = 1', '    y = 2' })
+    vim.api.nvim_set_current_buf(bufnr)
+
+    vim.fn.setreg('a', { 'bar()', 'baz()' }, 'v')
+    set_selection(bufnr, 2, 3)
+    paste.do_visual_paste('a', 'p', 'V')
+
+    assert_eq(get_lines(bufnr), { 'def foo():', '    bar()', '    baz()' })
+    delete_buf(bufnr)
+  end)
+
+  case('linewise visual paste reindents a single-line charwise register copied with indent', function()
+    local bufnr = make_buf({ 'root:', '  one: 1', '  two: 2' })
+    vim.api.nvim_set_current_buf(bufnr)
+
+    vim.fn.setreg('a', { '        three: 3' }, 'v')
+    set_selection(bufnr, 2, 2)
+    paste.do_visual_paste('a', 'p', 'V')
+
+    assert_eq(get_lines(bufnr), { 'root:', '  three: 3', '  two: 2' })
+    delete_buf(bufnr)
+  end)
+
+  case('linewise visual paste keeps the inner structure of a charwise block', function()
+    local bufnr = make_buf({ 'def foo():', '    x = 1', '    y = 2' })
+    vim.api.nvim_set_current_buf(bufnr)
+
+    -- A `v` yank that starts at `if` drops the first line's indent and keeps
+    -- the inner line's, plus a trailing blank entry from ending at `$`.
+    vim.fn.setreg('a', { 'if ok:', '            pass', '' }, 'v')
+    set_selection(bufnr, 3, 3)
+    paste.do_visual_paste('a', 'p', 'V')
+
+    assert_eq(get_lines(bufnr), { 'def foo():', '    x = 1', '    if ok:', '        pass' })
+    delete_buf(bufnr)
+  end)
+
+  case('linewise visual paste of a charwise register leaves registers untouched', function()
+    local bufnr = make_buf({ 'def foo():', '    x = 1', '    y = 2' })
+    vim.api.nvim_set_current_buf(bufnr)
+
+    vim.fn.setreg('a', { 'bar()', 'baz()' }, 'v')
+    local before = snapshot_registers()
+    set_selection(bufnr, 2, 3)
+    paste.do_visual_paste('a', 'p', 'V')
+
+    assert_eq(snapshot_registers(), before, 'register contents changed unexpectedly')
     delete_buf(bufnr)
   end)
 

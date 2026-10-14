@@ -11,7 +11,7 @@ Pasted code automatically lands at the correct indentation level.
 - Intercepts `p` / `P` / `gp` / `gP` so linewise pasted code lands at the right indent level automatically.
 - Adds `]p` / `[p` to paste charwise content as a correctly indented new line below/above.
 - Three-tier indent strategy: `indentexpr` -> treesitter scope analysis -> heuristic fallback.
-- Visual mode (`V` + `p`/`P`): replace selected lines with correctly indented content from linewise registers.
+- Visual mode (`V` + `p`/`P`): replace selected lines with correctly indented content from linewise or charwise registers.
 - Dot-repeat (`.`) works naturally.
 - Single undo step: one `u` undoes the entire paste.
 - Register-safe behavior: registers are read, never rewritten.
@@ -75,8 +75,8 @@ Indentation settings (`shiftwidth`, `expandtab`, `tabstop`) come from your buffe
 | Normal | `gP` | Smart paste before cursor line and follow to end |
 | Normal | `]p` | Paste charwise content as smart-indented new line below (linewise: same as `p`) |
 | Normal | `[p` | Paste charwise content as smart-indented new line above (linewise: same as `P`) |
-| Visual (linewise `V`) | `p` | Replace selection with smart-indented linewise content |
-| Visual (linewise `V`) | `P` | Replace selection with smart-indented linewise content |
+| Visual (linewise `V`) | `p` | Replace selection with smart-indented content |
+| Visual (linewise `V`) | `P` | Replace selection with smart-indented content |
 | Normal | `<Plug>(smart-paste-raw-p)` | Raw `p` (bypass smart paste) |
 | Normal | `<Plug>(smart-paste-raw-P)` | Raw `P` (bypass smart paste) |
 
@@ -85,7 +85,7 @@ Behavior notes:
 - Smart paste applies to linewise registers (for example: `yy`, `dd`, `2yy`, or linewise Visual `V` + `y`).
 - For charwise registers, `]p` and `[p` convert inline content into smart-indented new lines.
 - Characterwise paste on `p`/`P`/`gp`/`gP` and blockwise (`<C-v>`) paste use native Neovim behavior.
-- Visual `V` + `p`/`P` also falls back to native behavior when the source register is charwise or blockwise.
+- Visual `V` + `p`/`P` reindents charwise registers too, because Neovim always puts the register as whole lines over a `V` selection. This covers clipboard text copied outside Neovim without a trailing newline. Blockwise registers fall back to native behavior.
 - Visual fallbacks are fed as native `P`, so the text you paste over never overwrites the register. This matches the smart path, where registers are read but never rewritten.
 
 Example escape-hatch bindings:
