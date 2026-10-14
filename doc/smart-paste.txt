@@ -97,10 +97,11 @@ Default normal-mode mappings:
         (linewise register behavior is same as `P`)
 
 Default visual-mode mappings:
-- `p`   replace linewise visual selection with smart-indented linewise content
+- `p`   replace linewise visual selection with smart-indented content from
+        a linewise or charwise register
 - `P`   same replacement behavior (linewise visual mode)
-       (charwise/blockwise selections and source registers fall through to
-        native paste, fed as `P` so the replaced text never overwrites
+       (charwise/blockwise selections and blockwise registers fall through
+        to native paste, fed as `P` so the replaced text never overwrites
         registers)
 
 Escape hatches (vanilla behavior):
@@ -175,10 +176,12 @@ For charwise `]p`/`[p` conversion:
 
 Visual linewise replacement:
 1. Read register
-2. If register is not linewise, fall through to native visual paste
+2. If register is blockwise, fall through to native visual paste
    (fed as `P`, which does not overwrite registers)
-3. Delete selected lines with `nvim_buf_set_lines()`
-4. Insert adjusted lines with `nvim_put()`
+3. Charwise registers are converted like `]p` content, because Neovim
+   always puts the register as whole lines over a `V` selection
+4. Delete selected lines with `nvim_buf_set_lines()`
+5. Insert adjusted lines with `nvim_put()`
 
 Regular charwise `p`/`P`/`gp`/`gP` and blockwise operations fall through
 to vanilla Vim behavior.

@@ -67,6 +67,19 @@ local function strip_trailing_blank_lines(lines)
   return result
 end
 
+--- Convert charwise register lines into a block that pastes as whole lines.
+--- Charwise selections drop the first line's indent but keep the inner
+--- lines' absolute indent; rebase the first line so the block's relative
+--- structure survives the shift to the target indent.
+--- @param lines string[]
+--- @param bufnr integer
+--- @return string[] lines
+--- @return integer source_indent
+local function convert_charwise_to_linewise(lines, bufnr)
+  local stripped = strip_leading_whitespace(lines)
+  return indent.rebase_charwise_block(stripped, bufnr)
+end
+
 --- Resolve contextual indent for a specific row.
 --- For nonblank lines this uses actual leading whitespace width.
 --- For blank lines it falls back to indent engine prediction.
@@ -242,12 +255,8 @@ function M.do_paste(_motion_type)
     end
 
     if lines then
-      local stripped = strip_leading_whitespace(lines)
-      -- Charwise selections drop the first line's indent but keep the inner
-      -- lines' absolute indent; rebase the first line so the block's relative
-      -- structure survives the shift to the target indent.
       local bufnr = vim.api.nvim_get_current_buf()
-      local rebased, source_indent = indent.rebase_charwise_block(stripped, bufnr)
+      local rebased, source_indent = convert_charwise_to_linewise(lines, bufnr)
       local row = vim.api.nvim_win_get_cursor(0)[1] - 1 -- 0-indexed
       local target_indent = resolve_linewise_target_indent(bufnr, row, after)
       local delta = target_indent - source_indent
@@ -317,11 +326,13 @@ function M.do_visual_paste(reg, _key, vmode, count_override)
     return
   end
 
-  -- Visual smart replacement is linewise-only on both axes:
-  -- linewise selection (`V`) and linewise register (`V...`).
-  -- Charwise/blockwise registers fall through to native visual paste.
-  local is_linewise_register = type(reginfo.regtype) == 'string' and vim.startswith(reginfo.regtype, 'V')
-  if not is_linewise_register then
+  -- Over a `V` selection Neovim puts a charwise register as whole lines too,
+  -- so charwise registers get the same reindent as linewise ones.
+  -- Blockwise registers fall through to native visual paste.
+  local regtype = reginfo.regtype
+  local is_linewise_register = type(regtype) == 'string' and vim.startswith(regtype, 'V')
+  local is_charwise_register = regtype == 'v'
+  if not is_linewise_register and not is_charwise_register then
     feed_native_visual_paste(reg)
     return
   end
@@ -338,8 +349,14 @@ function M.do_visual_paste(reg, _key, vmode, count_override)
   local count = count_override or vim.v.count1
   local bufnr = vim.api.nvim_get_current_buf()
   local source_lines = strip_clipboard_cr(reg, reginfo.regcontents)
+  local source_indent
+  if is_charwise_register then
+    local trimmed = strip_trailing_blank_lines(source_lines)
+    source_lines, source_indent = convert_charwise_to_linewise(trimmed, bufnr)
+  else
+    source_indent = indent.get_source_indent(source_lines)
+  end
   local target_indent = select(1, resolve_row_context_indent(bufnr, start_row - 1))
-  local source_indent = indent.get_source_indent(source_lines)
   local delta = target_indent - source_indent
   local adjusted = indent.apply_delta(source_lines, delta, bufnr)
   local final_lines = repeat_lines(adjusted, count)
